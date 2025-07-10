@@ -143,7 +143,8 @@ class GeminiService:
         self,
         schema: Dict[str, Any],
         config: Dict[str, Any],
-        description: str = ""
+        description: str = "",
+        source_data: Optional[List[Dict[str, Any]]] = None
     ) -> List[Dict[str, Any]]:
         """Generate high-quality synthetic data - NO CACHED RESPONSES"""
         if not self.is_initialized:
@@ -152,11 +153,16 @@ class GeminiService:
         row_count = min(config.get('rowCount', 100), 100)  # Cap at 100 for quota management
         domain = config.get('domain', 'general')
         
+        # Include source data context if provided
+        source_context = ""
+        if source_data and len(source_data) > 0:
+            source_context = f"\nSource Data Sample: {json.dumps(source_data[:2], indent=2)}"
+        
         prompt = f"""
         Generate {row_count} rows of REALISTIC synthetic data for {domain} domain.
         
         Schema: {json.dumps(schema, indent=2)}
-        Description: {description}
+        Description: {description}{source_context}
         
         REQUIREMENTS:
         1. Generate REALISTIC data - no placeholder text
@@ -409,3 +415,156 @@ class GeminiService:
         except Exception as e:
             logger.error(f"❌ Schema analysis failed: {str(e)}")
             raise Exception(f"AI analysis failed: {str(e)}")
+
+    async def assess_privacy_risks(
+        self,
+        data: List[Dict[str, Any]],
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Assess privacy risks in dataset"""
+        if not self.is_initialized:
+            raise Exception("Gemini service not initialized")
+            
+        if not data:
+            raise Exception("No data provided for privacy assessment")
+        
+        prompt = f"""
+        Assess privacy risks in this dataset:
+        
+        Sample Data: {json.dumps(data[:3], indent=2)}
+        Configuration: {json.dumps(config, indent=2)}
+        
+        Analyze for:
+        1. PII (Personally Identifiable Information)
+        2. Sensitive attributes
+        3. Re-identification risks
+        4. Data linkage possibilities
+        5. GDPR/HIPAA compliance concerns
+        
+        Return JSON format:
+        {{
+            "privacy_score": 0-100,
+            "pii_detected": ["field1", "field2"],
+            "sensitive_attributes": ["attr1"],
+            "risk_level": "low|medium|high",
+            "recommendations": ["rec1", "rec2"]
+        }}
+        """
+        
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(self.model.generate_content, prompt),
+                timeout=30
+            )
+            
+            text = response.text.strip()
+            if '```json' in text:
+                text = text.split('```json')[1].split('```')[0]
+            
+            return json.loads(text.strip())
+            
+        except Exception as e:
+            logger.error(f"❌ Privacy assessment failed: {str(e)}")
+            raise Exception(f"AI privacy assessment failed: {str(e)}")
+
+    async def analyze_data_comprehensive(
+        self,
+        data: List[Dict[str, Any]],
+        schema: Dict[str, Any],
+        config: Dict[str, Any],
+        description: str = ""
+    ) -> Dict[str, Any]:
+        """Comprehensive data analysis for domain detection"""
+        if not self.is_initialized:
+            raise Exception("Gemini service not initialized")
+            
+        if not data:
+            raise Exception("No data provided for analysis")
+        
+        prompt = f"""
+        Analyze this dataset comprehensively:
+        
+        Sample Data: {json.dumps(data[:5], indent=2)}
+        Schema: {json.dumps(schema, indent=2)}
+        Description: {description}
+        
+        Provide analysis in JSON format:
+        {{
+            "domain": "healthcare|finance|retail|education|general",
+            "confidence": 0-100,
+            "data_quality": {{"score": 0-100, "issues": []}},
+            "patterns": ["pattern1", "pattern2"],
+            "relationships": ["rel1", "rel2"],
+            "recommendations": ["rec1", "rec2"]
+        }}
+        """
+        
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(self.model.generate_content, prompt),
+                timeout=30
+            )
+            
+            text = response.text.strip()
+            if '```json' in text:
+                text = text.split('```json')[1].split('```')[0]
+            
+            return json.loads(text.strip())
+            
+        except Exception as e:
+            logger.error(f"❌ Data analysis failed: {str(e)}")
+            raise Exception(f"AI data analysis failed: {str(e)}")
+
+    async def detect_bias_comprehensive(
+        self,
+        data: List[Dict[str, Any]],
+        config: Dict[str, Any],
+        domain_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Comprehensive bias detection in dataset"""
+        if not self.is_initialized:
+            raise Exception("Gemini service not initialized")
+            
+        if not data:
+            raise Exception("No data provided for bias detection")
+        
+        domain = domain_context.get('domain', 'general') if isinstance(domain_context, dict) else 'general'
+        
+        prompt = f"""
+        Analyze this {domain} dataset for bias:
+        
+        Sample Data: {json.dumps(data[:5], indent=2)}
+        Domain Context: {json.dumps(domain_context, indent=2)}
+        
+        Look for:
+        1. Demographic bias
+        2. Selection bias
+        3. Confirmation bias
+        4. Historical bias
+        5. Representation bias
+        
+        Return JSON format:
+        {{
+            "bias_score": 0-100,
+            "bias_types": ["type1", "type2"],
+            "risk_level": "low|medium|high",
+            "affected_groups": ["group1"],
+            "mitigation_strategies": ["strategy1", "strategy2"]
+        }}
+        """
+        
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(self.model.generate_content, prompt),
+                timeout=30
+            )
+            
+            text = response.text.strip()
+            if '```json' in text:
+                text = text.split('```json')[1].split('```')[0]
+            
+            return json.loads(text.strip())
+            
+        except Exception as e:
+            logger.error(f"❌ Bias detection failed: {str(e)}")
+            raise Exception(f"AI bias detection failed: {str(e)}")
