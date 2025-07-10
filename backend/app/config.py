@@ -1,5 +1,6 @@
 
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Optional
 import os
 
@@ -13,8 +14,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://default:2kjMvjplKbYLVZSrNftrWfFfC6bGNak9@redis-13890.c16.us-east-1-3.ec2.redns.redis-cloud.com:13890"
     redis_password: Optional[str] = "2kjMvjplKbYLVZSrNftrWfFfC6bGNak9"
     
-    # AI Services - FIXED: Proper environment variable mapping
-    gemini_api_key: str = ""  # Will be loaded from GEMINI_API_KEY environment variable
+    # AI Services - Load from environment
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     google_cloud_project_id: Optional[str] = "gen-lang-client-0626319060"
     
     # Vector Database
@@ -26,6 +27,9 @@ class Settings(BaseSettings):
     secret_key: str = "databank@super_secure_key115"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    
+    # CORS Settings
+    cors_origins: str = "http://localhost:8080,https://localhost:8080"
     
     # Celery/Background Jobs
     celery_broker_url: str = "redis://localhost:6379/0"
@@ -40,20 +44,17 @@ class Settings(BaseSettings):
     max_dataset_size_mb: int = 100
     default_cache_ttl: int = 3600  # 1 hour
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        # Field aliases to map environment variables to settings
-        fields = {
-            'gemini_api_key': {'env': 'GEMINI_API_KEY'}
-        }
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore"  # Ignore extra fields
+    }
         
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        # Fallback logic for Gemini API key
+        # Fallback logic for Gemini API key if not loaded from env
         if not self.gemini_api_key:
-            # Try multiple possible environment variable names
             self.gemini_api_key = (
                 os.getenv('GEMINI_API_KEY') or 
                 os.getenv('GOOGLE_API_KEY') or 
