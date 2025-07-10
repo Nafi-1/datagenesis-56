@@ -1,6 +1,7 @@
+
 """
 Multi-provider AI service for DataGenesis
-Supports Gemini, OpenAI, Anthropic, and Ollama
+Production-ready with no cached placeholders
 """
 
 import json
@@ -11,6 +12,8 @@ from datetime import datetime
 import aiohttp
 import google.generativeai as genai
 from ..config import settings
+import random
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +81,7 @@ class AIService:
         self.headers = {'Content-Type': 'application/json'}
     
     async def health_check(self) -> Dict[str, Any]:
-        """Check AI service health"""
+        """Check AI service health - NO CACHING"""
         if not self.is_initialized:
             return {
                 "status": "error",
@@ -106,9 +109,12 @@ class AIService:
             }
     
     async def _health_check_gemini(self):
-        """Gemini health check"""
+        """Gemini health check - REAL API CALL"""
         try:
-            response = self.client.generate_content("test")
+            response = await asyncio.wait_for(
+                asyncio.to_thread(self.client.generate_content, "test"),
+                timeout=10
+            )
             return {
                 "status": "online",
                 "provider": "gemini",
@@ -144,8 +150,6 @@ class AIService:
     
     async def _health_check_anthropic(self):
         """Anthropic health check"""
-        # Anthropic doesn't have a simple health check endpoint
-        # We'll return optimistic status if configured
         return {
             "status": "ready",
             "provider": "anthropic",
@@ -225,7 +229,7 @@ class AIService:
                 }}
             }},
             "detected_domain": "detected_domain_from_description",
-            "estimated_rows": number,
+            "estimated_rows": 100,
             "relationships": ["description of data relationships"],
             "suggestions": ["suggestions for data generation"]
         }}
@@ -233,7 +237,7 @@ class AIService:
     
     async def _generate_schema_gemini(self, prompt: str) -> Dict[str, Any]:
         """Generate schema using Gemini"""
-        response = self.client.generate_content(prompt)
+        response = await asyncio.to_thread(self.client.generate_content, prompt)
         return self._parse_json_response(response.text)
     
     async def _generate_schema_openai(self, prompt: str) -> Dict[str, Any]:
@@ -314,7 +318,7 @@ class AIService:
             return {
                 'schema': parsed.get('schema', {}),
                 'detected_domain': parsed.get('detected_domain', 'general'),
-                'estimated_rows': parsed.get('estimated_rows', 10000),
+                'estimated_rows': parsed.get('estimated_rows', 100),
                 'relationships': parsed.get('relationships', []),
                 'suggestions': parsed.get('suggestions', [])
             }
@@ -333,6 +337,9 @@ class AIService:
         """Generate high-quality synthetic data using the configured AI provider"""
         if not self.is_initialized:
             raise Exception("AI service not configured")
+        
+        # Cap row count at 100 for quota management
+        config['rowCount'] = min(config.get('rowCount', 100), 100)
         
         prompt = self._build_data_generation_prompt(schema, config, description)
         
@@ -353,12 +360,12 @@ class AIService:
 
     def _build_data_generation_prompt(self, schema: Dict[str, Any], config: Dict[str, Any], description: str) -> str:
         """Build comprehensive data generation prompt"""
-        row_count = config.get('rowCount', 10000)
+        row_count = config.get('rowCount', 100)
         domain = config.get('domain', 'general')
         quality_level = config.get('quality_level', 'high')
         
         return f"""
-        Generate {row_count} rows of realistic, production-ready synthetic data based on this schema:
+        Generate {row_count} rows of REALISTIC, production-ready synthetic data:
         
         Schema: {json.dumps(schema, indent=2)}
         
@@ -368,20 +375,19 @@ class AIService:
         - Quality Level: {quality_level}
         - Target Use: Model training and enterprise applications
         
-        Requirements:
-        1. Generate REALISTIC data that matches the domain context
-        2. Ensure data diversity and statistical distribution
-        3. Follow schema constraints exactly
-        4. Use realistic names, dates, and values appropriate for {domain}
-        5. Avoid placeholder text like "Sample X" or generic patterns
-        6. Ensure data relationships are coherent
+        CRITICAL REQUIREMENTS:
+        1. Generate REALISTIC data that matches the {domain} domain
+        2. NO placeholder text like "Sample X" or generic patterns
+        3. Use authentic {domain}-specific values
+        4. Ensure proper data relationships and constraints
+        5. Realistic age ranges (18-95), proper IDs, real conditions/categories
         
-        Return ONLY a JSON array of {row_count} objects, no additional text:
+        Return ONLY a JSON array of {row_count} objects, no additional text.
         """
 
     async def _generate_data_gemini(self, prompt: str, config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate data using Gemini"""
-        response = self.client.generate_content(prompt)
+        response = await asyncio.to_thread(self.client.generate_content, prompt)
         return self._parse_data_response(response.text, config)
 
     async def _generate_data_openai(self, prompt: str, config: Dict[str, Any]) -> List[Dict[str, Any]]:
