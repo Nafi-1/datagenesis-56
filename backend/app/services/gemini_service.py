@@ -1,4 +1,3 @@
-
 """
 Enhanced Gemini Service for DataGenesis
 Production-ready with no cached placeholders
@@ -18,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 class GeminiService:
     def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY
+        # FIXED: Use correct field name from settings
+        self.api_key = settings.gemini_api_key
         self.model = None
         self.is_initialized = False
         self.last_health_check = None

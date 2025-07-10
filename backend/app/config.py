@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://default:2kjMvjplKbYLVZSrNftrWfFfC6bGNak9@redis-13890.c16.us-east-1-3.ec2.redns.redis-cloud.com:13890"
     redis_password: Optional[str] = "2kjMvjplKbYLVZSrNftrWfFfC6bGNak9"
     
-    # AI Services - Fixed to properly read from .env
-    gemini_api_key: str = "AIzaSyA81SV6mvA9ShZasJgcVl4ps-YQm9DrKsc"
+    # AI Services - FIXED: Proper environment variable mapping
+    gemini_api_key: str = ""  # Will be loaded from GEMINI_API_KEY environment variable
     google_cloud_project_id: Optional[str] = "gen-lang-client-0626319060"
     
     # Vector Database
@@ -43,13 +43,22 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-        # Add extra configuration to help with environment loading
-        extra = "allow"
+        # Field aliases to map environment variables to settings
+        fields = {
+            'gemini_api_key': {'env': 'GEMINI_API_KEY'}
+        }
         
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Ensure we get the GEMINI_API_KEY if it's not loaded properly
+        
+        # Fallback logic for Gemini API key
         if not self.gemini_api_key:
-            self.gemini_api_key = os.getenv('GEMINI_API_KEY', 'AIzaSyDOFWw2dk2W28l52mXJxJXrcdYbxsQz13s')
+            # Try multiple possible environment variable names
+            self.gemini_api_key = (
+                os.getenv('GEMINI_API_KEY') or 
+                os.getenv('GOOGLE_API_KEY') or 
+                os.getenv('GOOGLE_GEMINI_API_KEY') or
+                "AIzaSyA81SV6mvA9ShZasJgcVl4ps-YQm9DrKsc"  # Fallback key
+            )
 
 settings = Settings()
